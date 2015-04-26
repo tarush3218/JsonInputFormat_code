@@ -1,0 +1,57 @@
+select temp.tsin,
+	sum(temp.price)/count(temp.tsin) as ASP,
+	coalesce(sum(case when date(temp.created_date) between temp.first_day_month and curdate() then temp.price end), 0) as MTD_sales,
+	coalesce(sum(case when date(temp.created_date) between temp.first_day_year and curdate() then temp.price end), 0) as YTD_sales,
+	coalesce(sum(case when date(temp.created_date) = temp.previous_day then temp.price end), 0) as Yesterday_sales,
+	temp.category
+from
+(select sfo.status as status,
+	sfoi.product_id as product_id,
+	sfoi.sku as sku,
+	sfoi.price as price,
+	sfoi.created_at as created_date,
+	date_add(curdate(), interval -dayofmonth(curdate())+1 day) as first_day_month,
+	date_add(date_add(curdate(), interval -dayofmonth(curdate())+1 day), interval -month(curdate())+1 month) as first_day_year,
+	date_add(curdate(), interval -1 day) as previous_day,
+	cpev.value as tsin,
+	ccev.value as category
+
+from
+sales_flat_order sfo join sales_flat_order_item sfoi on sfo.entity_id = sfoi.order_id
+left outer join catalog_product_entity_varchar cpev on sfoi.product_id = cpev.entity_id and cpev.attribute_id = 141
+left outer join catalog_category_product ccp on sfoi.product_id = ccp.product_id
+left outer join catalog_category_entity_varchar ccev on ccp.category_id = ccev.entity_id and ccev.attribute_id = 41) temp
+where temp.tsin is not null and year(temp.created_date) = year(curdate()) group by temp.tsin
+
+-----------------------------------------------------------------
+
+select temp.category,
+	temp.brand_name,
+	sum(case when temp.price between 0 and 1000 then 1 else 0 end) as '0 - 1000',
+	sum(case when temp.price between 1000 and 2000 then 1 else 0 end) as '1000 - 2000',
+	sum(case when temp.price between 2000 and 3000 then 1 else 0 end) as '2000 - 3000',
+	sum(case when temp.price between 3000 and 4000 then 1 else 0 end) as '3000 - 4000',
+	sum(case when temp.price between 4000 and 5000 then 1 else 0 end) as '4000 - 5000',
+	sum(case when temp.price between 5000 and 6000 then 1 else 0 end) as '5000 - 6000',
+	sum(case when temp.price between 6000 and 7000 then 1 else 0 end) as '6000 - 7000',
+	sum(case when temp.price between 7000 and 8000 then 1 else 0 end) as '7000 - 8000',
+	sum(case when temp.price between 8000 and 9000 then 1 else 0 end) as '8000 - 9000',
+	sum(case when temp.price between 9000 and 10000 then 1 else 0 end) as '9000 - 10000',
+	sum(case when temp.price > 10000 then 1 else 0 end) as 'Above 10000'
+	
+from
+(select ccev.value as category,
+	eapv.value as brand_name,
+	cped1.value as price
+from
+catalog_product_entity cpe left outer join catalog_product_entity_int cpei1 on cpe.entity_id = cpei1.entity_id and cpei1.attribute_id = 268
+left outer join eav_attribute_option eap on cpei1.value = eap.option_id and eap.attribute_id = 268
+left outer join eav_attribute_option_value eapv on eap.option_id = eapv.option_id
+left outer join catalog_product_entity_decimal cped1 on cpe.entity_id = cped1.entity_id and cped1.attribute_id = 75
+left outer join catalog_category_product ccp on cpe.entity_id = ccp.product_id
+left outer join catalog_category_entity_varchar ccev on ccp.category_id = ccev.entity_id and ccev.attribute_id = 41) temp
+where /*temp.category is not null and temp.brand_name is not null and*/ temp.price is not null group by temp.category, temp.brand_name
+
+
+
+
